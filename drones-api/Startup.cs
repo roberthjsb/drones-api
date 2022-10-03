@@ -1,7 +1,9 @@
+using drones_api.Entities.AppDBContext;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -26,6 +28,10 @@ namespace drones_api
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            string connection = Configuration.GetConnectionString("DefaultConnection");
+            services.AddDbContext<DronDBContext>(
+        options => options.UseSqlServer(connection));
+            services.AddAutoMapper(typeof(Startup));
             services.AddControllers();
             AddSwagger(services);
         }
@@ -37,14 +43,13 @@ namespace drones_api
 
                 options.SwaggerDoc(groupName, new OpenApiInfo
                 {
-                    Title = $"Foo {groupName}",
+                    Title = $"Drones {groupName}",
                     Version = groupName,
-                    Description = "Foo API",
+                    Description = "Drones API",
                     Contact = new OpenApiContact
                     {
-                        Name = "Foo Company",
+                        Name = "Test Company",
                         Email = string.Empty,
-                        Url = new Uri("https://foo.com/"),
                     }
                 });
             });
