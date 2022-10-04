@@ -6,6 +6,10 @@ namespace drones_api.Entities
 {
     public class Dron
     {
+        public Dron()
+        {
+            Medicines = new HashSet<Medicine>();
+        }
      [Required]
         public string SerialNumber { get; set; }
         [ListStringValidator(new[] { "peso ligero", "peso medio", "peso crucero", "peso pesado"})]
