@@ -36,6 +36,15 @@ namespace drones_api.Controllers
             return Ok( result);
         }
 
+        [HttpGet("available")]
+        public async Task<IActionResult> GetAvailable()
+        {
+            var list = await dbcontext.Drones.Where(x => x.State == DronState.INACTIVO).ToListAsync();
+            List<DronDtoResult> result = mapper.Map<List<Dron>, List<DronDtoResult>>(list);
+            return Ok(result);
+        }
+
+
         [HttpGet("{dronSerialNumber}/batery")]
         public async Task<IActionResult> GetStatusBatery(string dronSerialNumber)
         {
