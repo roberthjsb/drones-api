@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System;
 using drones_api.DTOS;
 using System.Collections.Generic;
+using drones_api.Enums;
+using drones_api.Results;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -100,18 +102,25 @@ namespace drones_api.Controllers
                     .Drones.Include(e => e.Medicines)
                     .FirstOrDefaultAsync(x => x.SerialNumber.Equals(dronSerialNumber));
 
-                if (dronFound==null) return NotFound();
-                //TODO: validar estados
-                if (dronFound.BateryLevel < 25) return Conflict();
-                dronFound.State = "CARGANDO";
+                if (dronFound == null) return NotFound(new ErrorResult("Dron no registrado"));
+                if (dronFound.BateryLevel < 25) return Conflict(new ErrorResult("Dron low Battery"));
+                if (dronFound.State != DronState.INACTIVO) return Conflict(new ErrorResult("Dron no disponible"));
+
+                dronFound.State = DronState.CARGANDO;
                 await dbcontext.SaveChangesAsync();
-
-
 
                 var medicine = mapper.Map<MedicineDto, Medicine>(medicinedto);
                 var pesoCargaDron = dronFound.Medicines.Select(e => e.Weigth).Sum();
 
-                if((pesoCargaDron + medicine.Weigth) > dronFound.LimitWeight) return Conflict();
+                if ((pesoCargaDron + medicine.Weigth) > dronFound.LimitWeight)
+                {
+                    return Conflict(new ErrorResult("Excede peso maximo"));
+                }
+                if ((pesoCargaDron + medicine.Weigth) == dronFound.LimitWeight)
+                {
+                    dronFound.State = DronState.CARGADO;
+                    dbcontext.SaveChanges();
+                }
 
                 dronFound.Medicines.Add(medicine);
                 await dbcontext.SaveChangesAsync();

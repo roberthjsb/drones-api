@@ -20,7 +20,9 @@ namespace drones_api.Entities.AppDBContext
             modelBuilder.Entity<Dron>().Property(e => e.BateryLevel).HasMaxLength(3);
             modelBuilder.Entity<Dron>().Property(e => e.Model).HasMaxLength(50);
             modelBuilder.Entity<Dron>().Property(e => e.State).HasMaxLength(30);
+            modelBuilder.Entity<Dron>().Property(e => e.State).HasConversion<string>().HasMaxLength(30);
             modelBuilder.Entity<Dron>().HasMany<Medicine>(e => e.Medicines);
+
 
             modelBuilder.Entity<Medicine>().HasKey(e => e.Code);
         }

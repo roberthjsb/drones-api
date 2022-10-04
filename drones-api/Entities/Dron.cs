@@ -1,4 +1,5 @@
-﻿using drones_api.Validators;
+﻿using drones_api.Enums;
+using drones_api.Validators;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -19,7 +20,7 @@ namespace drones_api.Entities
         [Range(0,100)]
         public int BateryLevel { get; set; }
         [ListStringValidator(new[] { "INACTIVO", "CARGANDO", "CARGADO", "ENTREGANDO CARGA", "CARGA ENTREGADA", "REGRESANDO" })]
-        public string State { get; set; }
+        public DronState State { get; set; }
 
         public ICollection<Medicine> Medicines { get; set; }
     }
