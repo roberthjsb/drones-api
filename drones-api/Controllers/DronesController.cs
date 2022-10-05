@@ -1,15 +1,15 @@
-﻿using drones_api.Entities;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Linq;
-using AutoMapper;
-using drones_api.Entities.AppDBContext;
-using System.Threading.Tasks;
+﻿using AutoMapper;
 using System;
-using drones_api.DTOS;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using drones_api.DTOS;
+using drones_api.Entities;
 using drones_api.Enums;
 using drones_api.Results;
+using drones_api.Services.Contracts;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -20,28 +20,45 @@ namespace drones_api.Controllers
     public class DronesController : ControllerBase
     {
         private readonly IMapper mapper;
-        private readonly DronDBContext dbcontext;
+        private readonly IDronService dronService;
+        private readonly ILogger logger;
 
-        public DronesController(IMapper mapper, DronDBContext dbcontext)
+        public DronesController(IMapper mapper, IDronService dronService, ILogger<DronesController> logger)
         {
             this.mapper = mapper;
-            this.dbcontext = dbcontext;
+            this.dronService = dronService;
+            this.logger = logger;
         }
         // GET: api/<DronesController>
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            var list = await dbcontext.Drones.ToListAsync();
-            List<DronDtoResult> result = mapper.Map<List<Dron>, List<DronDtoResult>>(list);
-            return Ok( result);
+            try
+            {
+                List<Dron> list = await dronService.GetListDrones();
+                List<DronDtoResult> result = mapper.Map<List<Dron>, List<DronDtoResult>>(list);
+                return Ok(result);
+            }
+            catch (Exception e)
+            {
+                return HandlerError(e);
+            }
+
         }
 
         [HttpGet("available")]
         public async Task<IActionResult> GetAvailable()
         {
-            var list = await dbcontext.Drones.Where(x => x.State == DronState.INACTIVO).ToListAsync();
-            List<DronDtoResult> result = mapper.Map<List<Dron>, List<DronDtoResult>>(list);
-            return Ok(result);
+            try
+            {
+                var list = await dronService.GetListDronesAvailable();
+                List<DronDtoResult> result = mapper.Map<List<Dron>, List<DronDtoResult>>(list);
+                return Ok(result);
+            }
+            catch (Exception e)
+            {
+                return HandlerError(e);
+            }
         }
 
 
@@ -50,15 +67,13 @@ namespace drones_api.Controllers
         {
             try
             {
-                Dron dronFound = await dbcontext
-                    .Drones
-                    .FirstOrDefaultAsync(x => x.SerialNumber.Equals(dronSerialNumber));
+                Dron dronFound = await dronService.GetDronById(dronSerialNumber);
                 if (dronFound == null) return BadRequest();
                 return Ok(dronFound.BateryLevel);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return this.Problem();
+                return HandlerError(e);
             }
         }
 
@@ -67,79 +82,80 @@ namespace drones_api.Controllers
         {
             try
             {
-                Dron dronFound = await dbcontext
-                     .Drones.Include(e => e.Medicines)
-                     .FirstOrDefaultAsync(x => x.SerialNumber.Equals(dronSerialNumber));
+                Dron dronFound = await dronService.GetDronById(dronSerialNumber);
                 if (dronFound == null) return BadRequest();
                 var pesoCargaDron = dronFound.Medicines.Select(e => e.Weigth).Sum();
                 return StatusCode(pesoCargaDron);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return this.Problem();
+                return HandlerError(e);
             }
         }
 
         // POST api/<DronesController>
         [HttpPost]
-        public async  Task<IActionResult> Post([FromBody] RegisterDronDTO drondto)
+        public async Task<IActionResult> Post([FromBody] RegisterDronDTO drondto)
         {
             try
             {
-                var found = await dbcontext.Drones.AnyAsync(x => x.SerialNumber.Equals(drondto.SerialNumber));
-                if (found) return BadRequest();
-                var dron =mapper.Map<RegisterDronDTO, Dron>(drondto);
-                dbcontext.Drones.Add(dron);
-                await dbcontext.SaveChangesAsync();
-
+                if (await dronService.ExistDron(drondto.SerialNumber))
+                    return BadRequest();
+                var dron = mapper.Map<RegisterDronDTO, Dron>(drondto);
+                await dronService.Register(dron);
                 return Ok(dron);
             }
-            catch(Exception)
+            catch (Exception e)
             {
-                return this.Problem();
+                return HandlerError(e);
             }
         }
 
-        // PUT api/<DronesController>/5
        
+
+        // PUT api/<DronesController>/5
+
         [HttpPost("{dronSerialNumber}/medicine")]
         public async Task<IActionResult> PostMedicine(string dronSerialNumber, [FromForm] MedicineDto medicinedto)
         {
             try
             {
-                Dron dronFound = await dbcontext
-                    .Drones.Include(e => e.Medicines)
-                    .FirstOrDefaultAsync(x => x.SerialNumber.Equals(dronSerialNumber));
+                Dron dronFound = await dronService.GetDronById(dronSerialNumber);
 
-                if (dronFound == null) return NotFound(new ErrorResult("Dron no registrado"));
+                if (dronFound == null) return NotFound(new ErrorResult("Dron not registed"));
                 if (dronFound.BateryLevel < 25) return Conflict(new ErrorResult("Dron low Battery"));
-                if (dronFound.State != DronState.INACTIVO) return Conflict(new ErrorResult("Dron no disponible"));
+                if (dronFound.State != DronState.INACTIVO) return Conflict(new ErrorResult("Dron not available"));
 
                 dronFound.State = DronState.CARGANDO;
-                await dbcontext.SaveChangesAsync();
+                await dronService.SaveChange();
 
                 var medicine = mapper.Map<MedicineDto, Medicine>(medicinedto);
-                var pesoCargaDron = dronFound.Medicines.Select(e => e.Weigth).Sum();
-
-                if ((pesoCargaDron + medicine.Weigth) > dronFound.LimitWeight)
+                var currentWeigthDron = dronFound.Medicines.Select(e => e.Weigth).Sum();
+                if ((currentWeigthDron + medicine.Weigth) > dronFound.LimitWeight)
                 {
-                    return Conflict(new ErrorResult("Excede peso maximo"));
+                    return Conflict(new ErrorResult("over max weigth"));
                 }
-                if ((pesoCargaDron + medicine.Weigth) == dronFound.LimitWeight)
+                if ((currentWeigthDron + medicine.Weigth) == dronFound.LimitWeight)
                 {
                     dronFound.State = DronState.CARGADO;
-                    dbcontext.SaveChanges();
+                    await dronService.SaveChange();
                 }
 
                 dronFound.Medicines.Add(medicine);
-                await dbcontext.SaveChangesAsync();
+                await dronService.SaveChange();
 
                 return StatusCode(201);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return this.Problem();
+                return HandlerError(e);
             }
+        }
+
+        private ObjectResult HandlerError(Exception e)
+        {
+            logger.LogError(e.Message);
+            return this.Problem();
         }
 
 

@@ -1,18 +1,13 @@
-using drones_api.Entities.AppDBContext;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using drones_api.Entities.AppDBContext;
+using drones_api.Services.Contracts;
+using drones_api.Services.Implementations;
 
 namespace drones_api
 {
@@ -29,6 +24,8 @@ namespace drones_api
         public void ConfigureServices(IServiceCollection services)
         {
             string connection = Configuration.GetConnectionString("DefaultConnection");
+            services.AddLogging();
+            services.AddScoped<IDronService, DronService>();
             services.AddDbContext<DronDBContext>(
         options => options.UseSqlServer(connection));
             services.AddAutoMapper(typeof(Startup));

@@ -1,7 +1,8 @@
-﻿using drones_api.Enums;
-using drones_api.Validators;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using drones_api.Enums;
+using drones_api.Validators;
 
 namespace drones_api.Entities
 {
@@ -23,5 +24,7 @@ namespace drones_api.Entities
         public DronState State { get; set; }
 
         public ICollection<Medicine> Medicines { get; set; }
+
+       
     }
 }
