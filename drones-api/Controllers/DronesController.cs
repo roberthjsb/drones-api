@@ -68,7 +68,7 @@ namespace drones_api.Controllers
             try
             {
                 Dron dronFound = await dronService.GetDronById(dronSerialNumber);
-                if (dronFound == null) return BadRequest();
+                if (dronFound == null) return NotFound(new ErrorResult("Dron not registed"));
                 return Ok(dronFound.BateryLevel);
             }
             catch (Exception e)
@@ -83,9 +83,9 @@ namespace drones_api.Controllers
             try
             {
                 Dron dronFound = await dronService.GetDronById(dronSerialNumber);
-                if (dronFound == null) return BadRequest();
+                if (dronFound == null) return NotFound(new ErrorResult("Dron not registed"));
                 var pesoCargaDron = dronFound.Medicines.Select(e => e.Weigth).Sum();
-                return StatusCode(pesoCargaDron);
+                return Ok(pesoCargaDron);
             }
             catch (Exception e)
             {
@@ -100,10 +100,11 @@ namespace drones_api.Controllers
             try
             {
                 if (await dronService.ExistDron(drondto.SerialNumber))
-                    return BadRequest();
+                    return NotFound(new ErrorResult("Dron not registed"));
                 var dron = mapper.Map<RegisterDronDTO, Dron>(drondto);
                 await dronService.Register(dron);
-                return Ok(dron);
+                var result=mapper.Map<DronDtoResult>(dron);
+                return StatusCode(201, result);
             }
             catch (Exception e)
             {
@@ -133,6 +134,8 @@ namespace drones_api.Controllers
                 var currentWeigthDron = dronFound.Medicines.Select(e => e.Weigth).Sum();
                 if ((currentWeigthDron + medicine.Weigth) > dronFound.LimitWeight)
                 {
+                    dronFound.State = DronState.INACTIVO;
+                    await dronService.SaveChange();
                     return Conflict(new ErrorResult("over max weigth"));
                 }
                 if ((currentWeigthDron + medicine.Weigth) == dronFound.LimitWeight)
@@ -155,7 +158,7 @@ namespace drones_api.Controllers
         private ObjectResult HandlerError(Exception e)
         {
             logger.LogError(e.Message);
-            return this.Problem();
+            return Problem("Internal Error");
         }
 
 

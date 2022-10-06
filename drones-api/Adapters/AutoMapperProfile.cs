@@ -26,6 +26,7 @@ namespace drones_api.Adapters
         {
             using(var ms = new MemoryStream())
             {
+                if (form == null) return ms.ToArray();
                 form.CopyTo(ms);
                 return ms.ToArray();
             }
